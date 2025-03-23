@@ -12,11 +12,12 @@ int main()
     c5 = 220.0 * pow(semitone_ratio, 3);
     c0 = c5 * pow(0.5, 5);
 
-    printf("Enter MIDI note (0 - 127): ");
+    printf("enter midi note (0 - 127): ");
     if(fgets(message, sizeof(message), stdin) == NULL) {
-        printf("Error reading the input\n");
+        printf("error reading the input\n");
         return 1;
     }
+
     if(message[0] == '\0') {
         printf("Have a nice day!\n");
         return 1;
