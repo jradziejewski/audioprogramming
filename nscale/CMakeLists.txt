@@ -3,4 +3,6 @@ project(nscale C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(nscale nscale.c)
+add_executable(nscale nscale.c
+        expdecay.c
+        expbrk.c)
