@@ -5,4 +5,5 @@ set(CMAKE_C_STANDARD 11)
 
 add_executable(nscale nscale.c
         expdecay.c
-        expbrk.c)
+        expbrk.c
+        expenvelgen.c)
