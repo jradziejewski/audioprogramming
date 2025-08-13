@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include "portsf.h"
 
+#define BLOCK_SIZE 1024
+
 enum {ARG_PROGNAME, ARG_INFILE, ARG_OUTFILE, ARG_NARGS};
 
 int main(int argc, char* argv[]) {
@@ -62,7 +64,7 @@ int main(int argc, char* argv[]) {
     }
 
     /* allocate  space for one sample frame */
-    frame = (float*) malloc(props.chans * sizeof(float));
+    frame = (float*) malloc(props.chans * BLOCK_SIZE * sizeof(float));
     if (frame==NULL) {
         puts("No memory!\n");
         error++;
@@ -80,17 +82,17 @@ int main(int argc, char* argv[]) {
     printf("copying...\n");
 
     /* single frame loop to do copy, report any errors */
-    framesread = psf_sndReadFloatFrames(ifd, frame, 1);
+    framesread = psf_sndReadFloatFrames(ifd, frame, BLOCK_SIZE);
     totalread = 0;
-    while (framesread == 1) {
+    while (framesread > 0) {
         totalread++;
-        if (psf_sndWriteFloatFrames(ofd, frame, 1) != 1) {
+        if (psf_sndWriteFloatFrames(ofd, frame, BLOCK_SIZE) != framesread) {
             printf("Error writing to outfile!\n");
             error++;
             break;
         }
         /* <-------------- Do any processing here! --------------> */
-        framesread = psf_sndReadFloatFrames(ifd, frame, 1);
+        framesread = psf_sndReadFloatFrames(ifd, frame, BLOCK_SIZE);
     }
     if (framesread < 0) {
         printf("Error reading infile. Outfile is incomplete.\n");
