@@ -86,7 +86,11 @@ int main(int argc, char* argv[]) {
     totalread = 0;
     while (framesread > 0) {
         totalread++;
-        if (psf_sndWriteFloatFrames(ofd, frame, BLOCK_SIZE) != framesread) {
+        if (totalread % (BLOCK_SIZE) == 0) {
+            printf("\rCopied %ld frames", totalread);
+            fflush(stdout);
+        }
+        if (psf_sndWriteFloatFrames(ofd, frame, framesread) != framesread) {
             printf("Error writing to outfile!\n");
             error++;
             break;
@@ -100,7 +104,7 @@ int main(int argc, char* argv[]) {
     }
     else
         printf("Done. %d sample frames copied to %s\n",
-            totalread, argv[ARG_OUTFILE]);
+            totalread * BLOCK_SIZE, argv[ARG_OUTFILE]);
 
     /* report PEAK values to user */
     if (psf_sndReadPeaks(ofd, peaks, NULL) > 0) {
