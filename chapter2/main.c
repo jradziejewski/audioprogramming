@@ -4,7 +4,7 @@
 
 #define BLOCK_SIZE 1024
 
-enum {ARG_PROGNAME, ARG_INFILE, ARG_OUTFILE, ARG_NARGS};
+enum {ARG_PROGNAME, ARG_INFILE, ARG_OUTFILE, ARG_AMPFAC, ARG_NARGS};
 
 int main(int argc, char* argv[]) {
     PSF_PROPS props;
@@ -16,12 +16,20 @@ int main(int argc, char* argv[]) {
     psf_format outformat = PSF_FMT_UNKNOWN;
     PSF_CHPEAK* peaks = NULL;
     float* frame = NULL;
+    float ampfac;
 
-    printf("SF2FLOAT: convert soundfile to floats format\n");
+    printf("SFGAIN: change level of soundfile\n");
 
     if (argc < ARG_NARGS) {
         printf("insufficient number of arguments\n"
-            "usage:\n\tsf2float infile outfile\n");
+            "usage:\nsfgain infile outfile ampfac\n"
+            "\twhere ampfac > 0");
+        return 1;
+    }
+
+    ampfac = atof(argv[ARG_AMPFAC]);
+    if (ampfac <= 0.0) {
+        printf("Error: ampfac must be positive.\n");
         return 1;
     }
 
@@ -35,12 +43,6 @@ int main(int argc, char* argv[]) {
         printf("Error: unable to open infile %s\n",
         argv[ARG_INFILE]);
         return 1;
-    }
-
-    /* we now have a resource, so we use goto hereafter on hitting any error */
-    /* tell user if source file is already floats */
-    if (props.samptype == PSF_SAMP_IEEE_FLOAT) {
-        printf("Info: infile is already in floats format.\n");
     }
 
     props.samptype = PSF_SAMP_IEEE_FLOAT;
@@ -90,6 +92,11 @@ int main(int argc, char* argv[]) {
             printf("\rCopied %ld frames", totalread);
             fflush(stdout);
         }
+
+        for (int i = 0; i < framesread * props.chans; i++) {
+                frame[i] *= ampfac;
+        }
+
         if (psf_sndWriteFloatFrames(ofd, frame, framesread) != framesread) {
             printf("Error writing to outfile!\n");
             error++;
