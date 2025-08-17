@@ -3530,18 +3530,15 @@ int psf_sndInfileProperties(const char *infile, int ifd, const PSF_PROPS *props)
 	return 1;
 }
 
-double maxsamp(float* buf, unsigned long blocksize)
-{
-	double absval, peak = 0.0;
-	unsigned long i;
-
-	for (i=0; i < blocksize; i++)
-	{
-		absval = fabs(buf[i]);
-		if (absval > peak)
-			peak = absval;
-	}
-	return peak;
+double maxsamp(float* buf, unsigned long blocksize) {
+    double absval, peak = 0.0;
+    unsigned long i;
+    for (i = 0; i < blocksize; i++) {
+        absval = fabs(buf[i]);
+        if (absval > peak)
+            peak = absval;
+    }
+    return peak;
 }
 
 PANPOS simplepan(double position)
