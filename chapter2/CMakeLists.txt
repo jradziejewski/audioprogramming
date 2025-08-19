@@ -6,7 +6,8 @@ set(CMAKE_C_STANDARD 11)
 add_executable(chapter2 main.c
         portsf/ieee80.c
         portsf/portsf.c
-        sfpan.c
+        breakpoints/breakpoints.c
 )
 
 target_include_directories(chapter2 PRIVATE portsf)
+target_include_directories(chapter2 PRIVATE breakpoints)
