@@ -85,7 +85,7 @@ int main(int argc, char* argv[]) {
     }
 
     /* output in stereo will be twice as big */
-    outframe = (float *) malloc(inprops.chans * BLOCK_SIZE * sizeof(float));
+    outframe = (float *) malloc(outprops.chans * BLOCK_SIZE * sizeof(float));
     if (outframe==NULL) {
         puts("No memory!\n");
         error++;
@@ -111,6 +111,12 @@ int main(int argc, char* argv[]) {
         if (totalread % (BLOCK_SIZE) == 0) {
             printf("\rCopied %ld frames", totalread);
             fflush(stdout);
+        }
+
+        int i, out_i;
+        for(i = 0, out_i = 0; i < framesread; i++) {
+            outframe[out_i++] = (float)(inframe[i] * thispos.left);
+            outframe[out_i++] = (float)(inframe[i] * thispos.right);
         }
 
         if (psf_sndWriteFloatFrames(ofd, outframe, framesread) != framesread) {
@@ -155,4 +161,3 @@ int main(int argc, char* argv[]) {
     psf_finish();
     return error;
 }
-

@@ -116,9 +116,7 @@ int main(int argc, char* argv[]) {
         int i, out_i;
         for(i = 0, out_i = 0; i < framesread; i++) {
             outframe[out_i++] = (float)(inframe[i] * thispos.left);
-            printf("%f\n", outframe[out_i]);
             outframe[out_i++] = (float)(inframe[i] * thispos.right);
-            printf("%f\n", outframe[out_i]);
         }
 
         if (psf_sndWriteFloatFrames(ofd, outframe, framesread) != framesread) {
