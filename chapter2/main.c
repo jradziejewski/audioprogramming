@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "portsf.h"
+#include "breakpoints.h"
 
 #define BLOCK_SIZE 1024
 
-enum {ARG_PROGNAME, ARG_INFILE, ARG_OUTFILE, ARG_PANPOS, ARG_NARGS};
+enum {ARG_PROGNAME, ARG_INFILE, ARG_OUTFILE, ARG_BRKFILE, ARG_NARGS};
 
 int main(int argc, char* argv[]) {
     PSF_PROPS inprops, outprops;
@@ -19,23 +20,56 @@ int main(int argc, char* argv[]) {
     float* outframe = NULL;
     float panpos;
     PANPOS thispos;
+    FILE* brkfile = NULL;
+    unsigned long size;
+    BREAKPOINT* points = NULL;
 
     printf("SFPAN: change panning of soundfile\n");
 
     if (argc < ARG_NARGS) {
         printf("insufficient number of arguments\n"
-            "usage:\nsfpan infile outfile panpos\n"
-            "\twhere ampfac > 0");
+            "usage:\nsfpanbrk infile outfile posfile.brk\n"
+            "\tposfile.brk is breakpoint file"
+            "with values in range -1.0 <= pos <= 1.0\n"
+            "where -1.0 = full Left, 0 = Centre, +1.0 = full Right");
         return 1;
     }
 
-    panpos = atof(argv[ARG_PANPOS]);
-    if (panpos > 1.0 || panpos < -1.0) {
-        printf("Error: panpos must be between -1 and 1.\n");
+    brkfile = fopen(argv[ARG_BRKFILE], "r");
+    if (brkfile == NULL) {
+        printf("Error: Unable to open\n"
+            "breakpoint file %s\n", argv[ARG_BRKFILE]);
+        error++;
+        goto exit;
+    }
+
+    points = get_breakpoints(brkfile, &size);
+    if (points==NULL) {
+        printf("No breakpoints read.\n");
+        error++;
+        goto exit;
+    }
+
+    if (size < 2) {
+        printf("Error: at least two breakpoints required\n");
+        free(points);
+        fclose(brkfile);
         return 1;
     }
 
-    thispos = simplepan(panpos);
+    if (points[0].time != 0.0) {
+        printf("Error in breakpoint data: "
+            "first time must be 0.0\n");
+        error++;
+        goto exit;
+    }
+
+    if (!inrange(points, -1, 1.0, size)) {
+        printf("Error in breakpoint data: "
+            "values out of range -1 to +1\n");
+        error++;
+        goto exit;
+    }
 
     if (psf_init()) {
         printf("unable to start portsf\n");
@@ -103,6 +137,11 @@ int main(int argc, char* argv[]) {
 
     printf("copying...\n");
 
+    double sampletime = 0.0;
+    double timeincr = 1.0 / inprops.srate;
+    double stereopos;
+    PANPOS pos;
+
     /* single frame loop to do copy, report any errors */
     framesread = psf_sndReadFloatFrames(ifd, inframe, BLOCK_SIZE);
     totalread = 0;
@@ -115,8 +154,11 @@ int main(int argc, char* argv[]) {
 
         int i, out_i;
         for(i = 0, out_i = 0; i < framesread; i++) {
-            outframe[out_i++] = (float)(inframe[i] * thispos.left);
-            outframe[out_i++] = (float)(inframe[i] * thispos.right);
+            stereopos = val_at_brktime(points, size, sampletime);
+            pos = simplepan(stereopos);
+            outframe[out_i++] = (float)(inframe[i] * pos.left);
+            outframe[out_i++] = (float)(inframe[i] * pos.right);
+            sampletime += timeincr;
         }
 
         if (psf_sndWriteFloatFrames(ofd, outframe, framesread) != framesread) {
@@ -148,6 +190,10 @@ int main(int argc, char* argv[]) {
     }
     /* do all cleanup */
     exit:
+    if (brkfile)
+        fclose(brkfile);
+    if (points)
+        free(points);
     if (ifd >= 0)
         psf_sndClose(ifd);
     if (ofd >= 0)
