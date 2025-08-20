@@ -156,6 +156,7 @@ int main(int argc, char* argv[]) {
         for(i = 0, out_i = 0; i < framesread; i++) {
             stereopos = val_at_brktime(points, size, sampletime);
             pos = simplepan(stereopos);
+            printf("%f: %f %f\n", sampletime, pos.left, pos.right);
             outframe[out_i++] = (float)(inframe[i] * pos.left);
             outframe[out_i++] = (float)(inframe[i] * pos.right);
             sampletime += timeincr;
@@ -166,7 +167,6 @@ int main(int argc, char* argv[]) {
             error++;
             break;
         }
-        /* <-------------- Do any processing here! --------------> */
         framesread = psf_sndReadFloatFrames(ifd, inframe, BLOCK_SIZE);
     }
     if (framesread < 0) {
@@ -207,3 +207,5 @@ int main(int argc, char* argv[]) {
     psf_finish();
     return error;
 }
+
+

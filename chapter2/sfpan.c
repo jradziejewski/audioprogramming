@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    thispos = simplepan(panpos);
+    thispos = constpower(panpos);
 
     if (psf_init()) {
         printf("unable to start portsf\n");
