@@ -7,6 +7,7 @@ add_executable(chapter2 main.c
         portsf/ieee80.c
         portsf/portsf.c
         breakpoints/breakpoints.c
+        envx.c
 )
 
 target_include_directories(chapter2 PRIVATE portsf)
