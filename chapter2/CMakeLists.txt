@@ -7,8 +7,9 @@ add_executable(chapter2 main.c
         portsf/ieee80.c
         portsf/portsf.c
         breakpoints/breakpoints.c
-        oscils/oscils.c
+        wave/wave.c
 )
 
 target_include_directories(chapter2 PRIVATE portsf)
 target_include_directories(chapter2 PRIVATE breakpoints)
+target_include_directories(chapter2 PRIVATE wave)
