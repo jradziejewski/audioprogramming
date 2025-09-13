@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "breakpoints.h"
 #include "portsf.h"
 #include "wave.h"
 
@@ -11,6 +13,12 @@ int main(int argc, char* argv[]) {
     PSF_PROPS outprops;
     unsigned long nbufs, outframes, remainder, i;
     unsigned long nframes = BLOCK_SIZE;
+
+    BRKSTREAM* ampstream = NULL;
+    FILE *fpamp = NULL;
+    unsigned long brkampSize = 0;
+    double minval, maxval;
+    double amp;
 
     /* init resource vars to default states */
     int ofd = 1;
@@ -30,7 +38,7 @@ int main(int argc, char* argv[]) {
             "4     = sawdown\n"
             "dur   = duration of outfile (seconds)\n"
             "srate = required sample rate of outfile\n"
-            "amp   = amplitude (0 < amp <= 1.0)\n"
+            "amp   = amplitude value or breakpoint file (0 < amp <= 1.0)\n"
             "freq  = frequency (freq > 0)\n");
         return 1;
     }
@@ -65,21 +73,13 @@ int main(int argc, char* argv[]) {
 
     double dur = atof(argv[ARG_DUR]);
     unsigned long srate = atof(argv[ARG_SRATE]);
-    double amp = atof(argv[ARG_AMP]);
-    if (amp < 0 || amp > 1.0) {
-        printf("Error: amp must be between 0 and 1\n");
-        error++;
-        goto exit;
-    }
-    if (amp == 1.0) {
-        amp -= 0.01;
-    }
     double freq = atof(argv[ARG_FREQ]);
     if (freq < 0) {
         printf("Error: frequency must be positive\n");
         error++;
         goto exit;
     }
+
 
     OSCIL* p_osc = new_oscil(srate);
 
@@ -98,6 +98,27 @@ int main(int argc, char* argv[]) {
         printf("unable to start portsf\n");
         return 1;
     }
+
+    fpamp = fopen(argv[ARG_AMP], "r");
+    if (fpamp == NULL) {
+        amp = atof(argv[ARG_AMP]);
+        if (amp <= 0.0 || amp > 1.0) {
+            printf("Error: amplitude value out of range:"
+                   "0.0 < amp <= 1.0\n");
+            error++;
+            goto exit;
+        }
+    } else {
+        ampstream = bps_newstream(fpamp, outprops.srate, &brkampSize);
+
+        if (bps_getminmax(ampstream, &minval, &maxval)) {
+            printf("Error reading range of breakpoint file %s\n", argv[ARG_AMP]);
+            error++;
+            goto exit;
+        }
+    }
+
+
 
     /* output in stereo will be twice as big */
     float* outframe = malloc(BLOCK_SIZE * outprops.chans * sizeof(float));
@@ -130,6 +151,9 @@ int main(int argc, char* argv[]) {
     for (i = 0; i < nbufs; i++) {
         if (i == nbufs-1) nframes = remainder;
         for (unsigned long j = 0; j < nframes; j++) {
+            if (ampstream)
+                amp = bps_tick(ampstream);
+            if (amp == 1.0) amp = 0.999f;
             outframe[j] = (float) (amp * tick(p_osc, freq));
         }
         if (psf_sndWriteFloatFrames(ofd, outframe, nframes) != nframes) {
@@ -141,6 +165,9 @@ int main(int argc, char* argv[]) {
 
     /* do all cleanup */
     exit:
+    if (fpamp)
+        if (fclose(fpamp))
+            printf("Error closing file\n");
     if (ofd >= 0)
         psf_sndClose(ofd);
     psf_finish();
