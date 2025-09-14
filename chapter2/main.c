@@ -14,6 +14,10 @@ int main(int argc, char* argv[]) {
     unsigned long nbufs, outframes, remainder, i;
     unsigned long nframes = BLOCK_SIZE;
 
+    OSCIL **oscs = NULL;
+    double *oscamps = NULL, *oscfreqs = NULL; /* for oscbank amp and freq data */
+    unsigned long noscs;
+
     BRKSTREAM* ampstream = NULL;
     FILE *fpamp = NULL;
     unsigned long brkampSize = 0;
@@ -29,13 +33,12 @@ int main(int argc, char* argv[]) {
 
     if (argc < ARG_NARGS) {
         printf("insufficient number of arguments\n"
-            "usage:\nsiggen outfile wavetype dur srate amp freq\n"
+            "usage:\noscgen outfile dur srate nchans amp freq wavetype noscs\n"
             "where wavetype=:\n"
-            "0     = sine\n"
+            "0     = square\n"
             "1     = triangle\n"
-            "2     = square\n"
-            "3     = sawup\n"
-            "4     = sawdown\n"
+            "2     = saw up\n"
+            "3     = saw down\n"
             "dur   = duration of outfile (seconds)\n"
             "srate = required sample rate of outfile\n"
             "amp   = amplitude value or breakpoint file (0 < amp <= 1.0)\n"
@@ -154,6 +157,7 @@ int main(int argc, char* argv[]) {
             if (ampstream)
                 amp = bps_tick(ampstream);
             if (amp == 1.0) amp = 0.999f;
+            // TODO add breakpoint support for frequency
             outframe[j] = (float) (amp * tick(p_osc, freq));
         }
         if (psf_sndWriteFloatFrames(ofd, outframe, nframes) != nframes) {
