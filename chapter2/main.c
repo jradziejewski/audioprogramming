@@ -7,7 +7,11 @@
 
 #define BLOCK_SIZE 1024
 
-enum {ARG_PROGNAME, ARG_OUTFILE, ARG_TYPE, ARG_DUR, ARG_SRATE, ARG_AMP, ARG_FREQ, ARG_NARGS};
+enum {
+    ARG_PROGNAME, ARG_OUTFILE, ARG_DUR, ARG_SRATE, ARG_NCHANS, ARG_AMP,
+    ARG_FREQ, ARG_WAVETYPE, ARG_NOSCS, ARG_NARGS
+};
+
 
 int main(int argc, char* argv[]) {
     PSF_PROPS outprops;
@@ -25,26 +29,26 @@ int main(int argc, char* argv[]) {
     int error = 0;
     psf_format outformat = PSF_FMT_UNKNOWN;
     PSF_CHPEAK* peaks = NULL;
-    printf("SIGGEN: produces a sine wave (as a mono soundfile)\n");
+
+    printf("OSCGEN: sinusoidal oscillator bank\n");
 
     if (argc < ARG_NARGS) {
         printf("insufficient number of arguments\n"
-            "usage:\nsiggen outfile wavetype dur srate amp freq\n"
+            "usage:\noscgen outfile dur srate nchans amp freq wavetype noscs\n"
             "where wavetype=:\n"
-            "0     = sine\n"
-            "1     = triangle\n"
-            "2     = square\n"
-            "3     = sawup\n"
-            "4     = sawdown\n"
+            "1     = square\n"
+            "2     = triangle\n"
+            "3     = saw up\n"
+            "4     = saw down\n"
             "dur   = duration of outfile (seconds)\n"
             "srate = required sample rate of outfile\n"
             "amp   = amplitude value or breakpoint file (0 < amp <= 1.0)\n"
-            "freq  = frequency value or breakpoint file (freq > 0)\n");
+            "freq  = frequency (freq > 0)\n");
         return 1;
     }
 
 
-    int wavetype = atoi(argv[ARG_TYPE]);
+    int wavetype = atoi(argv[ARG_WAVETYPE]);
     if (wavetype < WAVE_SINE || wavetype >= WAVE_NTYPES) {
         printf("Error: bad value for wave type\n");
         error++;
@@ -52,27 +56,10 @@ int main(int argc, char* argv[]) {
     }
 
     tickfunc tick;
-    switch (wavetype) {
-        case WAVE_SINE:
-            tick = sinetick;
-            break;
-        case WAVE_TRIANGLE:
-            tick = tritick;
-            break;
-        case WAVE_SQUARE:
-            tick = sqtick;
-            break;
-        case WAVE_SAWUP:
-            tick = sawutick;
-            break;
-        case WAVE_SAWDOWN:
-            tick = sawdtick;
-        default:
-            break;
-    }
 
     double dur = atof(argv[ARG_DUR]);
-    unsigned long srate = atof(argv[ARG_SRATE]);
+    unsigned long srate = atoi(argv[ARG_SRATE]);
+    unsigned long noscs = atoi(argv[ARG_NOSCS]);
 
 
     OSCIL* p_osc = new_oscil(srate);
@@ -162,15 +149,95 @@ int main(int argc, char* argv[]) {
         goto exit;
     }
 
+    /* create amp and freq arrays */
+    double *oscamps = (double*) malloc(noscs * sizeof(double));
+    if (oscamps==NULL) {
+        puts("No memory!\n");
+        error++;
+        goto exit;
+    }
+    double *oscfreqs = (double*) malloc(noscs * sizeof(double));
+    if (oscfreqs==NULL) {
+        puts("No memory!\n");
+        error++;
+        goto exit;
+    }
+    /* create array of pointers to OSCILs */
+    OSCIL **oscs = (OSCIL**) malloc(noscs * sizeof(OSCIL*));
+    if (oscs==NULL) {
+        puts("No memory!\n");
+        error++;
+        goto exit;
+    }
+
+    double ampfac = 1.0;
+    double freqfac = 1.0;
+    double ampadjust = 0.0;
+
+    for (i = 0; i < noscs; i++) {
+        oscs[i] = new_oscil(outprops.srate);
+        if (oscs[i] == NULL) {
+            puts("No memory!\n");
+            error++;
+            goto exit;
+        }
+    }
+
+    switch (wavetype) {
+        case WAVE_TRIANGLE:
+            for(i=0;i< noscs;i++) {
+                oscamps[i] = ampfac;
+                oscfreqs[i] = freqfac;
+                freqfac += 2.0;
+                ampadjust += ampfac;
+                ampfac = 1.0 /(freqfac*freqfac);
+            }
+            break;
+        case WAVE_SQUARE:
+            for (i = 0; i < noscs; i++) {
+                ampfac = 1.0 / freqfac;
+                oscamps[i] = ampfac;
+                oscfreqs[i] = freqfac;
+                freqfac += 2.0;
+                ampadjust += ampfac;
+            }
+            break;
+        case WAVE_SAWUP:
+        case WAVE_SAWDOWN:
+            for (i = 0; i < noscs; i++) {
+                ampfac = 1.0 / freqfac;
+                oscamps[i] = ampfac;
+                oscfreqs[i] = freqfac;
+                freqfac += 1.0;
+                ampadjust += ampfac;
+            }
+            if (wavetype == WAVE_SAWUP) {
+                ampadjust = -ampadjust; /* inverts waveform */
+            }
+            break;
+        default:
+            break;
+    }
+
+    for (i = 0; i < noscs; i++) {
+        oscamps[i] /= ampadjust;
+    }
+
+    double val;
+
     for (i = 0; i < nbufs; i++) {
         if (i == nbufs-1) nframes = remainder;
         for (unsigned long j = 0; j < nframes; j++) {
-            if (ampstream)
-                amp = bps_tick(ampstream);
-            if (amp == 1.0) amp = 0.999f;
+            long k;
             if (freqstream)
                 freq = bps_tick(freqstream);
-            outframe[j] = (float) (amp * tick(p_osc, freq));
+            if (ampstream)
+                amp = bps_tick(ampstream);
+            val = 0.0;
+            for (k = 0; k < noscs; k++) {
+                val += oscamps[k] * sinetick(oscs[k], freq * oscfreqs[k]);
+            }
+            outframe[j] = (float)(val * amp);
         }
         if (psf_sndWriteFloatFrames(ofd, outframe, nframes) != nframes) {
             printf("Error writing to outfile\n");
@@ -181,6 +248,17 @@ int main(int argc, char* argv[]) {
 
     /* do all cleanup */
     exit:
+    if (oscamps)
+        free(oscamps);
+    if (oscfreqs)
+        free(oscfreqs);
+    if (oscs) {
+        for (i = 0; i < noscs; i++) {
+            if (oscs[i])
+                free(oscs[i]);
+        }
+        free(oscs);
+    }
     if (fpamp)
         if (fclose(fpamp))
             printf("Error closing file\n");
