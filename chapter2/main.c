@@ -12,6 +12,19 @@ enum {
     ARG_FREQ, ARG_WAVETYPE, ARG_NOSCS, ARG_NARGS
 };
 
+OSCIL* new_oscilp(double srate, double phase) {
+    OSCIL *p_osc;
+    p_osc = (OSCIL*)malloc(sizeof(OSCIL));
+    if (p_osc == NULL)
+        return NULL;
+
+    p_osc->twopiovrsr = TWOPI / (double)srate;
+    p_osc->curfreq = 0.0;
+    p_osc->curphase = TWOPI * phase;
+    p_osc->incr = 0.0;
+    return p_osc;
+}
+
 
 int main(int argc, char* argv[]) {
     PSF_PROPS outprops;
@@ -23,6 +36,7 @@ int main(int argc, char* argv[]) {
     unsigned long brkampSize = 0;
     double minval, maxval;
     double amp, freq;
+    double phase = 0.0;
 
     /* init resource vars to default states */
     int ofd = 1;
@@ -174,15 +188,6 @@ int main(int argc, char* argv[]) {
     double freqfac = 1.0;
     double ampadjust = 0.0;
 
-    for (i = 0; i < noscs; i++) {
-        oscs[i] = new_oscil(outprops.srate);
-        if (oscs[i] == NULL) {
-            puts("No memory!\n");
-            error++;
-            goto exit;
-        }
-    }
-
     switch (wavetype) {
         case WAVE_TRIANGLE:
             for(i=0;i< noscs;i++) {
@@ -192,6 +197,7 @@ int main(int argc, char* argv[]) {
                 ampadjust += ampfac;
                 ampfac = 1.0 /(freqfac*freqfac);
             }
+            phase = 0.25;
             break;
         case WAVE_SQUARE:
             for (i = 0; i < noscs; i++) {
@@ -221,6 +227,15 @@ int main(int argc, char* argv[]) {
 
     for (i = 0; i < noscs; i++) {
         oscamps[i] /= ampadjust;
+    }
+
+    for (i = 0; i < noscs; i++) {
+        oscs[i] = new_oscilp(outprops.srate, phase);
+        if (oscs[i] == NULL) {
+            puts("No memory!\n");
+            error++;
+            goto exit;
+        }
     }
 
     double val;
